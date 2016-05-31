@@ -1,56 +1,145 @@
-(function($) {
-  "use strict";
+window.onload = init;
+var peer;
+var connection;
+var myNickname;
+var roomLink;
+var input;
+var messagebox;
 
+function initDomElements(){
+	roomLink = document.getElementById('room-link');
+	input = document.getElementById('message-input');
+	messagebox = document.getElementById('messages');
+}
 
-  $(document).ready(function(){  
+function init(){
+	initDomElements();
+	initPeer();
+	myNickname = prompt("Please enter a nick name", "Deepak");
+	if(myNickname == null)
+		myNickname = "Deepak"
+}
 
-    //active menu
- 
-    $('a[href^="#"]').on('click', function (e) {
-      e.preventDefault();
-      $(document).off("scroll");
- 
-      $('a').each(function () {
-        $(this).removeClass('active');
-      })
-      $(this).addClass('active');
- 
-      var target = this.hash;
-      $target = $(target);
-      $('html, body').stop().animate({
-//        'scrollTop': $target.offset().top+2
-      }, 500, 'swing', function () {
-        window.location.hash = target;
-        $(document).on("scroll", onScroll);
-      });
-    });
-});
+function onPeerConnect(conn){
+		console.log("connected");
+		connection = conn;
+		connection.on('data', onReceive);
+		connection.on('close', onConnectionClose);
+		setTimeout(function(){
+			connection.send({nick_name: '* ' , text: myNickname+" has joined."});
+			}
+		,1000);
+}
 
+function initPeer(id){
+	if(id)
+		peer = new Peer(id, {key: 'ckwwf1ovpe2sxlxr'});
+	else
+		peer = new Peer({key: 'ckwwf1ovpe2sxlxr'});
+	peer.on('open',
+            function(id){
+                input.onkeydown = function(e){
+                if (e.keyCode == 13 /* ENTER */ && !e.shiftKey) {
+                      e.preventDefault();
+                      var text = e.target.value
+                      e.target.value = ''
+                      sendMessage(text);
+                    }
+                };
+                if(location.hash == ''){
+                    location.hash = id;
+                    roomLink.innerHTML = "Invite: <a href=\""+location.href+"\">"+ location.href+"</a>";
+                    console.log("Waiting for peers...");
+                    peer.on('connection', onPeerConnect);
+                }
+                else{
+                    console.log("Connecting to peer...");
+                    var conn = peer.connect(location.hash.substring(1));
+                    conn.on('open', function(){
+                        onPeerConnect(conn)
+                    });
+                }
+        });
+}
+function onReceive(data){
+    appendMessage(data.nick_name, data.text);
+}
 
+function sendMessage(message){
+	if(message != ''){
+		if(connection){
+		connection.send({nick_name: myNickname , text: message});
+		}
+		appendMessage(myNickname , message);
+	}
+}
 
-    //typed js
-    $(".typed").typed({
-        strings: ["This is chat.rtc", "The communications are powered by WebRTC"],
-        typeSpeed: 100,
-        backDelay: 900,
-        // loop
-        loop: true
-    });
-
-  function inits() {
-    window.addEventListener('scroll', function(e){
-        var distanceY = window.pageYOffset || document.documentElement.scrollTop,
-            shrinkOn = 300,
-            header = document.querySelector(".for-sticky");
-        if (distanceY > shrinkOn) {
-            classie.add(header,"opacity-nav");
-        } else {
-            if (classie.has(header,"opacity-nav")) {
-                classie.remove(header,"opacity-nav");
-            }
-          }
-      });
+function appendMyMessage(message)
+{
+    var messageEl = document.createElement('div');
+ 	messageEl.classList.add('message');
+    messageEl.classList.add('me');
+	var spanEl = document.createElement('span');
+	spanEl.classList.add('nick-name');
+	messageEl.appendChild(spanEl);
+    spanEl.textContent = "me ";    
+	var textEl = document.createElement('span');
+	textEl.classList.add('text');
+	textEl.textContent = message || '';
+	messageEl.appendChild(textEl);
+	messagebox.appendChild(messageEl);
+	messagebox.scrollTop = messagebox.scrollHeight;
+}
+function appendSendersMessage(nick,message){
+    
+    
+    
+    
+    
+    var messageEl = document.createElement('div');
+ 	messageEl.classList.add('message');
+    if (nick=="*"){
+        messageEl.classList.add('sender');    
     }
+    else{
+    messageEl.classList.add('sender');
+    }
+	var textEl = document.createElement('span');
+	textEl.classList.add('text');
+	textEl.textContent = message || '';
+    var spanEl = document.createElement('span');
+	spanEl.classList.add('nick-name');
+	messageEl.appendChild(spanEl);
+    spanEl.textContent = nick;  
+	messageEl.appendChild(textEl);
+	messagebox.appendChild(messageEl);
+	messagebox.scrollTop = messagebox.scrollHeight;
+}
 
-  window.onload = inits();
-  })(jQuery);
+function appendMessage(nick, message){
+    if (nick == myNickname){
+        appendMyMessage(message);
+    }else{
+        appendSendersMessage(nick,message);
+    }
+	
+}
+
+
+
+function onConnectionClose(){
+		connection = null;
+		peer.destroy();
+		while(!peer.destroyed);
+		peer = null;
+		initPeer(location.hash.substring(1));
+		location.hash = '';
+}
+
+function closeConnection(){
+	if(connection){
+		connection.sendMessage({nick: '!' , text: myNickname+" has left."});
+		connection.close();
+	}
+	peer.destroy();
+}
