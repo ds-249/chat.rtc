@@ -91,11 +91,6 @@ function appendMyMessage(message)
 	messagebox.scrollTop = messagebox.scrollHeight;
 }
 function appendSendersMessage(nick,message){
-    
-    
-    
-    
-    
     var messageEl = document.createElement('div');
  	messageEl.classList.add('message');
     if (nick=="*"){
